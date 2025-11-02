@@ -1,5 +1,5 @@
 name: "Actions Up"
-description: "Check Actions for Updates with actions-up and report out-of-date actions in Pull Requests, Workflow Outputs, or via the Job Status."
+description: "Check Actions for Updates with actions-up and report out-of-date actions in Pull Requests, Outputs, or Job Status."
 author: "Shane"
 branding:
   icon: "upload"
