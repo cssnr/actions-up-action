@@ -1,0 +1,52 @@
+name: "PR Labeler"
+
+on:
+  pull_request_target:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  labeler:
+    name: "Labeler"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: "Checkout Configs"
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: cssnr/configs
+          ref: master
+          path: .configs
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            labels/**
+
+      - name: "Debug"
+        continue-on-error: true
+        run: |
+          echo "::group::labels.yaml"
+          cat .configs/labels/labels.yaml
+          echo "::endgroup::"
+
+          echo "::group::labeler.yaml"
+          cat .configs/labels/labeler.yaml
+          echo "::endgroup::"
+
+      - name: "Label Creator"
+        continue-on-error: true
+        uses: cssnr/label-creator-action@fc7d9fa6a9e27c561a2bb802a9d2a8f21682279d # v1.0.2
+        with:
+          file: .configs/labels/labels.yaml
+
+      - name: "Labeler"
+        uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
+        with:
+          sync-labels: true
+          configuration-path: .configs/labels/labeler.yaml

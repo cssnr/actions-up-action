@@ -1,0 +1,45 @@
+name: "Actions Up"
+description: "Check Actions for Updates with actions-up and report out-of-date actions in Pull Requests, Workflow Outputs, or via the Job Status."
+author: "Shane"
+branding:
+  icon: "upload"
+  color: "blue"
+
+inputs:
+  path:
+    description: "Actions Scan Path"
+    default: "."
+  heading:
+    description: "Comment Heading"
+    default: "### Actions Up"
+  open:
+    description: "Details Open by Default"
+    default: "true"
+  columns:
+    description: "Results Table Columns"
+    default: "n,f,b,l"
+  exclude:
+    description: "CSV or Newline List of Excludes"
+  fail:
+    description: "Fail Job if Updates are Found"
+    default: "false"
+  summary:
+    description: "Add Workflow Job Summary"
+    default: "true"
+  token:
+    description: "For use with a PAT"
+    default: ${{ github.token }}
+
+outputs:
+  hasUpdates:
+    description: "If Updates true Else false"
+  actions:
+    description: "Actions Checked"
+  updates:
+    description: "Actions Up Results"
+  markdown:
+    description: "Results Markdown Table"
+
+runs:
+  using: "node24"
+  main: "dist/index.js"
