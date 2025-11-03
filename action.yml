@@ -19,7 +19,9 @@ inputs:
     description: "Results Table Columns"
     default: "n,f,b,l"
   exclude:
-    description: "CSV or Newline List of Excludes"
+    description: "List of Action Regex to Exclude"
+  files:
+    description: "List of File Names to Exclude"
   fail:
     description: "Fail Job if Updates are Found"
     default: "false"

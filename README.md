@@ -96,7 +96,8 @@ Want to automatically updated tags on release? [cssnr/update-version-tags-action
 | [heading](#heading) | `### Actions Up`   | Comment Heading                           |
 | [open](#open)       | `true`             | Details Open by Default                   |
 | [columns](#columns) | `n,f,b,l`          | Results Table Columns                     |
-| [exclude](#exclude) | -                  | CSV or Newline List of Excludes           |
+| [exclude](#exclude) | -                  | List of Action Regex to Exclude           |
+| [files](#files)     | -                  | List of File Names to Exclude             |
 | [fail](#fail)       | `false`            | Fail Job if Updates are Found             |
 | [summary](#summary) | `true`             | Add Workflow Job Summary                  |
 | [token](#token)     | `github.token`     | For use with a PAT                        |
@@ -136,7 +137,7 @@ Default: `n,f,b,l`
 
 #### exclude
 
-CSV or Newline Delimited list of excludes.
+CSV or Newline List of Action Regex to Exclude.
 See [azat-io/actions-up#cli-excludes](https://github.com/azat-io/actions-up?tab=readme-ov-file#cli-excludes) for more details.
 
 <details><summary>View CSV and Newline Examples</summary>
@@ -147,12 +148,35 @@ CSV. You can use quotes on single-line inputs because YAML removes the quotes ar
 exclude: 'actions/.*, docker/.*'
 ```
 
-Multi-Line. You can NOT use quotes on multi-line put because YAML does NOT remove the quotes.
+Multi-Line. You can NOT use quotes on multi-line inputs because YAML does NOT remove the quotes.
 
 ```yaml
 exclude: |
   actions/.*
   docker/.*
+```
+
+</details>
+
+#### files
+
+CSV or Newline List of File Names to Exclude.
+All actions in these files will be excluded.
+
+<details><summary>View CSV and Newline Examples</summary>
+
+CSV. You can use quotes on single-line inputs because YAML removes the quotes around the string.
+
+```yaml
+files: 'lint.yaml, release.yaml'
+```
+
+Multi-Line. You can NOT use quotes on multi-line inputs because YAML does NOT remove the quotes.
+
+```yaml
+files: |
+  lint.yaml
+  release.yaml
 ```
 
 </details>

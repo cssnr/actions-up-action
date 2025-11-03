@@ -1,6 +1,8 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 
+import path from 'node:path'
+
 import { createHash } from 'node:crypto'
 import { markdownTable } from 'markdown-table'
 import { scanGitHubActions, checkUpdates } from 'actions-up'
@@ -32,69 +34,47 @@ const maps = {
         const inputs = getInputs()
         core.startGroup('Inputs')
         console.log(inputs)
-        process.env['GITHUB_TOKEN'] = inputs.token
         core.endGroup() // Inputs
+        process.env['GITHUB_TOKEN'] = inputs.token
 
         // Scan Result
-        core.startGroup(`Scan Result: \u001b[36;1m${inputs.path}`)
         const scanResult = await scanGitHubActions(inputs.path)
+        core.startGroup(`Scan Result: \u001b[36;1m${inputs.path}`)
         console.log(scanResult)
         core.endGroup() // Scan Result
 
-        let actions = scanResult.actions
-        console.log('actions.length:', actions.length)
-
-        if (inputs.exclude) {
-            core.startGroup('Actions - excludes')
-            const excludes = inputs.exclude.split(/[,\n]/)
-            console.log('excludes:', excludes)
-            actions = scanResult.actions.filter((action) => {
-                return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
-            })
-            console.log(actions)
-            core.endGroup() // Actions - excludes
-
-            console.log('actions.length:', actions.length)
-        } else {
-            core.info('No excludes to process...')
-        }
+        // Actions
+        const actions = filterActions(inputs, scanResult.actions)
+        core.startGroup(`Actions (${actions.length})`)
+        console.log(actions)
+        core.endGroup() // Actions
 
         // Updates
-        core.startGroup('All Updates')
         const actionUpdates = await checkUpdates(actions)
-        console.log(actionUpdates)
-        core.endGroup() // All Updates
-
-        console.log('actionUpdates.length:', actionUpdates.length)
-
-        core.startGroup('Updates')
         const updates = actionUpdates.filter((item) => item.hasUpdate)
+        core.startGroup(`Updates (${updates.length})`)
         console.log(updates)
         core.endGroup() // Updates
 
-        console.log('updates.length:', updates.length)
-
-        // Table
-        core.startGroup('Table')
-        const data = genTableData(inputs, updates)
-        console.log(data)
-        core.endGroup() // Table
+        // Table Data
+        const tableData = genTableData(inputs, updates)
+        core.startGroup(`Table Data (${tableData.length})`)
+        console.log(tableData)
+        core.endGroup() // Table Data
 
         // Markdown
+        const markdown = genMarkdown(inputs, scanResult, actions, tableData)
         core.startGroup('Markdown')
-        const markdown = genMarkdown(inputs, scanResult, actions, data)
         console.log(markdown)
         core.endGroup() // Markdown
 
         // Update PR
         const hasUpdates = !!updates.length
-        console.log('hasUpdates:', hasUpdates)
-        console.log('eventName:', github.context.eventName)
-        console.log('comments:', github.context.payload.pull_request?.comments)
+        core.info(`Has Updates: \u001b[36;1m${hasUpdates}`)
 
         const events = ['pull_request', 'pull_request_target']
         const isPR = events.includes(github.context.eventName)
-        console.log('isPR:', isPR)
+        core.info(`Pull Request: \u001b[36;1m${isPR}`)
 
         let comment
         if (isPR && (github.context.payload.pull_request?.comments || hasUpdates)) {
@@ -159,14 +139,14 @@ async function updatePull(inputs, markdown, changes) {
     let comment = await pull.getComment('<!-- actions-up-action')
     // console.log('comment:', comment)
     if (!comment && !changes) {
-        console.log('No comment AND no changes, skipping...')
+        console.log('no comment AND no changes, skipping...')
         return comment
     }
 
     // Step 2 - Update Comment: Skip, Edit, or Add
     if (comment) {
         // Step 2A - Comment Found ...
-        console.log('Comment Found:', comment.id)
+        console.log('Comment ID:', comment.id)
         const oldHex = comment.body.split(' ', 3)[2]
         console.log('oldHex:', oldHex)
         console.log('newHex:', newHex)
@@ -177,28 +157,72 @@ async function updatePull(inputs, markdown, changes) {
         } else {
             // Step 2A-2 - Invalid Hex - Edit
             console.log('Comment Invalid Hex - Edit')
-            const response = await pull.updateComment(comment.id, body)
             // TODO: Add error handling
+            const response = await pull.updateComment(comment.id, body)
             console.log('response.status:', response.status)
             return comment
         }
     } else {
-        // Step 2B - Not Found - Add
-        console.log('Not Found - Add')
-        const response = await pull.createComment(body)
+        // Step 2B - Comment Not Found - Add
+        console.log('Comment Not Found - Add')
         // TODO: Add error handling
+        const response = await pull.createComment(body)
         console.log('response.status:', response.status)
         return response.data
     }
 }
 
 /**
+ * Filter Actions
+ * @param {Inputs} inputs
+ * @param {*[]} actions
+ * @return {*[]}
+ */
+function filterActions(inputs, actions) {
+    core.debug(`filterActions - actions.length: ${actions.length}`)
+    if (!actions.length) return actions
+
+    if (inputs.exclude) {
+        const excludes = inputs.exclude
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        core.startGroup(`Action Excludes (${excludes.length})`)
+        console.log(excludes)
+        core.endGroup()
+        actions = actions.filter((action) => {
+            return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
+        })
+    } else {
+        core.debug('No Action Excludes')
+    }
+
+    if (inputs.files) {
+        const excludes = inputs.files
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        core.startGroup(`Workflow Excludes (${excludes.length})`)
+        console.log(excludes)
+        core.endGroup()
+        actions = actions.filter((action) => {
+            return !excludes.includes(path.basename(action.file))
+        })
+    } else {
+        core.debug('No Workflow Excludes')
+    }
+
+    return actions
+}
+
+/**
  * Generate Table Data
  * @param {Inputs} inputs
- * @param updates
+ * @param {*[]} updates
  * @return {*[]}
  */
 function genTableData(inputs, updates) {
+    core.debug(`genTableData - updates.length: ${updates.length}`)
     const results = []
     for (const update of updates) {
         const fileName = update.action.file.split('.github/workflows/')[1]
@@ -206,10 +230,10 @@ function genTableData(inputs, updates) {
 
         let url
         if (github.context.payload.pull_request?.head) {
-            console.log('Generating File Links to Pull Request')
+            core.debug('Generating File Links to Pull Request')
             url = `${github.context.payload.pull_request.head.repo.html_url}/blob/${github.context.payload.pull_request.head.ref}/.github/workflows/${fileName}#L${update.action.line}`
         } else {
-            console.log('Generating File Links to Branch')
+            core.debug('Generating File Links to Branch')
             url = `${github.context.payload.repository.html_url}/blob/${process.env.GITHUB_REF_NAME}/.github/workflows/${fileName}#L${update.action.line}`
         }
         core.debug(`url: ${url}`)
@@ -235,25 +259,25 @@ function genTableData(inputs, updates) {
  * @param {Inputs} inputs
  * @param scanResult
  * @param {*[]} actions
- * @param {*[]} data
+ * @param {*[]} tableData
  * @return {string}
  */
-function genMarkdown(inputs, scanResult, actions, data) {
+function genMarkdown(inputs, scanResult, actions, tableData) {
     let md = `${inputs.heading}\n\n`
-    md += `Scanned ${scanResult.workflows.size} workflows, checked ${actions.length} actions and found ${data.length} updates.\n\n`
+    md += `Scanned ${scanResult.workflows.size} workflows, checked ${actions.length} actions and found ${tableData.length} updates.\n\n`
 
-    if (data.length) {
+    if (tableData.length) {
         const [cols, align] = [[], []]
         inputs.columns.forEach((c) => cols.push(maps[c].col))
         inputs.columns.forEach((c) => align.push(maps[c].align))
         // console.log('cols, align:', cols, align)
 
         const open = inputs.open ? ' open' : ''
-        const table = markdownTable([cols, ...data], { align })
+        const table = markdownTable([cols, ...tableData], { align })
         // console.log('table:\n', table)
         md += `<details${open}><summary>Results</summary>\n\n${table}\n\n</details>\n\n`
     } else {
-        core.debug('No data')
+        core.debug('No tableData')
         md += `✅ All Checked Actions Up-To-Date\n`
     }
 
@@ -320,6 +344,7 @@ async function addSummary(inputs, markdown, comment, actions, updates) {
  * @property {boolean} open
  * @property {string[]} columns
  * @property {string} exclude
+ * @property {string} files
  * @property {boolean} fail
  * @property {boolean} summary
  * @property {string} token
@@ -332,6 +357,7 @@ function getInputs() {
         open: core.getBooleanInput('open'),
         columns: core.getInput('columns').split(','),
         exclude: core.getInput('exclude'),
+        files: core.getInput('files'),
         fail: core.getBooleanInput('fail'),
         summary: core.getBooleanInput('summary'),
         token: core.getInput('token', { required: true }),
