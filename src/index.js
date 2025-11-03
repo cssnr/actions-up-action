@@ -206,7 +206,7 @@ function filterActions(inputs, actions) {
         console.log(excludes)
         core.endGroup()
         actions = actions.filter((action) => {
-            return !excludes.some((file) => path.basename(action.file) === file)
+            return !excludes.includes(path.basename(action.file))
         })
     } else {
         core.debug('No Workflow Excludes')

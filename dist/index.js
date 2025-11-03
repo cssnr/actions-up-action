@@ -42234,7 +42234,7 @@ function filterActions(inputs, actions) {
         console.log(excludes);
         coreExports.endGroup();
         actions = actions.filter((action) => {
-            return !excludes.some((file) => path.basename(action.file) === file)
+            return !excludes.includes(path.basename(action.file))
         });
     } else {
         coreExports.debug('No Workflow Excludes');
