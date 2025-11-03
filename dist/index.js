@@ -42073,14 +42073,14 @@ const maps = {
 
         // Actions
         const actions = filterActions(inputs, scanResult.actions);
-        coreExports.startGroup(`Actions: \u001b[36;1m${actions.length}`);
+        coreExports.startGroup(`Actions (${actions.length})`);
         console.log(actions);
         coreExports.endGroup(); // Actions
 
         // Updates
         const actionUpdates = await checkUpdates(actions);
         const updates = actionUpdates.filter((item) => item.hasUpdate);
-        coreExports.startGroup(`Updates: \u001b[36;1m${updates.length}`);
+        coreExports.startGroup(`Updates (${updates.length})`);
         console.log(updates);
         coreExports.endGroup(); // Updates
 
@@ -42209,11 +42209,11 @@ async function updatePull(inputs, markdown, changes) {
  * @return {*[]}
  */
 function filterActions(inputs, actions) {
-    console.log('actions.length:', actions.length);
+    coreExports.debug(`filterActions - actions.length: ${actions.length}`);
     if (!actions.length) return actions
 
     if (inputs.exclude) {
-        coreExports.info('Processing Action Excludes...');
+        coreExports.info('Processing Action Excludes.');
         const excludes = inputs.exclude
             .split(/[,\n]/)
             .map((s) => s.trim())
@@ -42227,7 +42227,7 @@ function filterActions(inputs, actions) {
     }
 
     if (inputs.files) {
-        coreExports.info('Processing Workflow Excludes...');
+        coreExports.info('Processing Workflow Excludes.');
         const excludes = inputs.files
             .split(/[,\n]/)
             .map((s) => s.trim())
@@ -42250,6 +42250,7 @@ function filterActions(inputs, actions) {
  * @return {*[]}
  */
 function genTableData(inputs, updates) {
+    coreExports.debug(`genTableData - updates.length: ${updates.length}`);
     const results = [];
     for (const update of updates) {
         const fileName = update.action.file.split('.github/workflows/')[1];
@@ -42257,10 +42258,10 @@ function genTableData(inputs, updates) {
 
         let url;
         if (githubExports.context.payload.pull_request?.head) {
-            console.log('Generating File Links to Pull Request');
+            coreExports.debug('Generating File Links to Pull Request');
             url = `${githubExports.context.payload.pull_request.head.repo.html_url}/blob/${githubExports.context.payload.pull_request.head.ref}/.github/workflows/${fileName}#L${update.action.line}`;
         } else {
-            console.log('Generating File Links to Branch');
+            coreExports.debug('Generating File Links to Branch');
             url = `${githubExports.context.payload.repository.html_url}/blob/${process.env.GITHUB_REF_NAME}/.github/workflows/${fileName}#L${update.action.line}`;
         }
         coreExports.debug(`url: ${url}`);

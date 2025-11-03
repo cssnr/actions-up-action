@@ -46,19 +46,12 @@ jobs:
           fail: false
           open: true
           #columns: "n,f,b,l"
-          #exclude: "actions/.*"
           exclude: "cssnr/.*,actions/.*"
           #exclude: |
           #  cssnr/.*
           #  actions/.*
-          #exclude: |
-          #  check-build.yaml
-          #  labeler.yaml
-          #  lint.yaml
-          #  mirror.yaml
-          #  pull.yaml
-          #  release.yaml
-          #  tags.yaml
+          files: |
+            test.yaml
 
       - name: "Verify Outputs"
         if: ${{ !github.event.act }}

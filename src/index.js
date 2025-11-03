@@ -45,14 +45,14 @@ const maps = {
 
         // Actions
         const actions = filterActions(inputs, scanResult.actions)
-        core.startGroup(`Actions: \u001b[36;1m${actions.length}`)
+        core.startGroup(`Actions (${actions.length})`)
         console.log(actions)
         core.endGroup() // Actions
 
         // Updates
         const actionUpdates = await checkUpdates(actions)
         const updates = actionUpdates.filter((item) => item.hasUpdate)
-        core.startGroup(`Updates: \u001b[36;1m${updates.length}`)
+        core.startGroup(`Updates (${updates.length})`)
         console.log(updates)
         core.endGroup() // Updates
 
@@ -181,11 +181,11 @@ async function updatePull(inputs, markdown, changes) {
  * @return {*[]}
  */
 function filterActions(inputs, actions) {
-    console.log('actions.length:', actions.length)
+    core.debug(`filterActions - actions.length: ${actions.length}`)
     if (!actions.length) return actions
 
     if (inputs.exclude) {
-        core.info('Processing Action Excludes...')
+        core.info('Processing Action Excludes.')
         const excludes = inputs.exclude
             .split(/[,\n]/)
             .map((s) => s.trim())
@@ -199,7 +199,7 @@ function filterActions(inputs, actions) {
     }
 
     if (inputs.files) {
-        core.info('Processing Workflow Excludes...')
+        core.info('Processing Workflow Excludes.')
         const excludes = inputs.files
             .split(/[,\n]/)
             .map((s) => s.trim())
@@ -222,6 +222,7 @@ function filterActions(inputs, actions) {
  * @return {*[]}
  */
 function genTableData(inputs, updates) {
+    core.debug(`genTableData - updates.length: ${updates.length}`)
     const results = []
     for (const update of updates) {
         const fileName = update.action.file.split('.github/workflows/')[1]
@@ -229,10 +230,10 @@ function genTableData(inputs, updates) {
 
         let url
         if (github.context.payload.pull_request?.head) {
-            console.log('Generating File Links to Pull Request')
+            core.debug('Generating File Links to Pull Request')
             url = `${github.context.payload.pull_request.head.repo.html_url}/blob/${github.context.payload.pull_request.head.ref}/.github/workflows/${fileName}#L${update.action.line}`
         } else {
-            console.log('Generating File Links to Branch')
+            core.debug('Generating File Links to Branch')
             url = `${github.context.payload.repository.html_url}/blob/${process.env.GITHUB_REF_NAME}/.github/workflows/${fileName}#L${update.action.line}`
         }
         core.debug(`url: ${url}`)
