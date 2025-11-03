@@ -42086,7 +42086,7 @@ const maps = {
 
         // Table Data
         const tableData = genTableData(inputs, updates);
-        coreExports.startGroup('Table Data');
+        coreExports.startGroup(`Table Data (${tableData.length})`);
         console.log(tableData);
         coreExports.endGroup(); // Table Data
 
@@ -42213,12 +42213,13 @@ function filterActions(inputs, actions) {
     if (!actions.length) return actions
 
     if (inputs.exclude) {
-        coreExports.info('Processing Action Excludes.');
         const excludes = inputs.exclude
             .split(/[,\n]/)
             .map((s) => s.trim())
             .filter(Boolean);
-        console.log(`excludes (${excludes.length}):`, excludes);
+        coreExports.startGroup(`Action Excludes (${excludes.length})`);
+        console.log(excludes);
+        coreExports.endGroup();
         actions = actions.filter((action) => {
             return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
         });
@@ -42227,12 +42228,13 @@ function filterActions(inputs, actions) {
     }
 
     if (inputs.files) {
-        coreExports.info('Processing Workflow Excludes.');
         const excludes = inputs.files
             .split(/[,\n]/)
             .map((s) => s.trim())
             .filter(Boolean);
-        console.log(`excludes (${excludes.length}):`, excludes);
+        coreExports.startGroup(`Workflow Excludes (${excludes.length})`);
+        console.log(excludes);
+        coreExports.endGroup();
         actions = actions.filter((action) => {
             return !excludes.some((file) => path.basename(action.file) === file)
         });

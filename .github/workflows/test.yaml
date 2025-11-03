@@ -50,8 +50,8 @@ jobs:
           #exclude: |
           #  cssnr/.*
           #  actions/.*
-          files: |
-            test.yaml
+          #files: |
+          #  test.yaml
 
       - name: "Verify Outputs"
         if: ${{ !github.event.act }}
