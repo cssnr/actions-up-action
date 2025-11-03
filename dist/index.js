@@ -42098,13 +42098,11 @@ const maps = {
 
         // Update PR
         const hasUpdates = !!updates.length;
-        console.log('hasUpdates:', hasUpdates);
-        console.log('eventName:', githubExports.context.eventName);
-        console.log('comments:', githubExports.context.payload.pull_request?.comments);
+        coreExports.info(`Has Updates: \u001b[36;1m${hasUpdates}`);
 
         const events = ['pull_request', 'pull_request_target'];
         const isPR = events.includes(githubExports.context.eventName);
-        console.log('isPR:', isPR);
+        coreExports.info(`Pull Request: \u001b[36;1m${isPR}`);
 
         let comment;
         if (isPR && (githubExports.context.payload.pull_request?.comments || hasUpdates)) {
@@ -42224,7 +42222,7 @@ function filterActions(inputs, actions) {
             return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
         });
     } else {
-        coreExports.info('No Action Excludes.');
+        coreExports.debug('No Action Excludes');
     }
 
     if (inputs.files) {
@@ -42239,7 +42237,7 @@ function filterActions(inputs, actions) {
             return !excludes.some((file) => path.basename(action.file) === file)
         });
     } else {
-        coreExports.info('No Workflow Excludes.');
+        coreExports.debug('No Workflow Excludes');
     }
 
     return actions

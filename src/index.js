@@ -70,13 +70,11 @@ const maps = {
 
         // Update PR
         const hasUpdates = !!updates.length
-        console.log('hasUpdates:', hasUpdates)
-        console.log('eventName:', github.context.eventName)
-        console.log('comments:', github.context.payload.pull_request?.comments)
+        core.info(`Has Updates: \u001b[36;1m${hasUpdates}`)
 
         const events = ['pull_request', 'pull_request_target']
         const isPR = events.includes(github.context.eventName)
-        console.log('isPR:', isPR)
+        core.info(`Pull Request: \u001b[36;1m${isPR}`)
 
         let comment
         if (isPR && (github.context.payload.pull_request?.comments || hasUpdates)) {
@@ -196,7 +194,7 @@ function filterActions(inputs, actions) {
             return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
         })
     } else {
-        core.info('No Action Excludes.')
+        core.debug('No Action Excludes')
     }
 
     if (inputs.files) {
@@ -211,7 +209,7 @@ function filterActions(inputs, actions) {
             return !excludes.some((file) => path.basename(action.file) === file)
         })
     } else {
-        core.info('No Workflow Excludes.')
+        core.debug('No Workflow Excludes')
     }
 
     return actions
