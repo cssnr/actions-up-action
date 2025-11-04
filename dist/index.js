@@ -42071,10 +42071,14 @@ const maps = {
         console.log(scanResult);
         coreExports.endGroup(); // Scan Result
 
+        // Excludes
         const excludes = inputs.exclude
             .split(/[,\n]/)
             .map((s) => s.trim())
             .filter(Boolean);
+        coreExports.startGroup(`Exclude (${excludes.length})`);
+        console.log(excludes);
+        coreExports.endGroup(); // Excludes
 
         // Actions
         const actions = filterActions(inputs, scanResult.actions, excludes);
@@ -42084,7 +42088,7 @@ const maps = {
 
         // Updates
         const actionUpdates = await checkUpdates(actions);
-        console.log('actionUpdates:', actionUpdates);
+        // console.log('actionUpdates:', actionUpdates)
         const updates = actionUpdates.filter((item) => item.hasUpdate);
         coreExports.startGroup(`Updates (${updates.length})`);
         console.log(updates);

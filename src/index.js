@@ -43,10 +43,14 @@ const maps = {
         console.log(scanResult)
         core.endGroup() // Scan Result
 
+        // Excludes
         const excludes = inputs.exclude
             .split(/[,\n]/)
             .map((s) => s.trim())
             .filter(Boolean)
+        core.startGroup(`Exclude (${excludes.length})`)
+        console.log(excludes)
+        core.endGroup() // Excludes
 
         // Actions
         const actions = filterActions(inputs, scanResult.actions, excludes)
