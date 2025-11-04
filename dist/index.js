@@ -42063,22 +42063,18 @@ const maps = {
         coreExports.startGroup('Inputs');
         console.log(inputs);
         coreExports.endGroup(); // Inputs
+
         process.env['GITHUB_TOKEN'] = inputs.token;
+        const excludes = inputs.exclude
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
 
         // Scan Result
         const scanResult = await scanGitHubActions(inputs.path);
         coreExports.startGroup(`Scan Result: \u001b[36;1m${inputs.path}`);
         console.log(scanResult);
         coreExports.endGroup(); // Scan Result
-
-        // Excludes
-        const excludes = inputs.exclude
-            .split(/[,\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean);
-        coreExports.startGroup(`Exclude (${excludes.length})`);
-        console.log(excludes);
-        coreExports.endGroup(); // Excludes
 
         // Actions
         const actions = filterActions(inputs, scanResult.actions, excludes);

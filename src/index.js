@@ -35,22 +35,18 @@ const maps = {
         core.startGroup('Inputs')
         console.log(inputs)
         core.endGroup() // Inputs
+
         process.env['GITHUB_TOKEN'] = inputs.token
+        const excludes = inputs.exclude
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
 
         // Scan Result
         const scanResult = await scanGitHubActions(inputs.path)
         core.startGroup(`Scan Result: \u001b[36;1m${inputs.path}`)
         console.log(scanResult)
         core.endGroup() // Scan Result
-
-        // Excludes
-        const excludes = inputs.exclude
-            .split(/[,\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean)
-        core.startGroup(`Exclude (${excludes.length})`)
-        console.log(excludes)
-        core.endGroup() // Excludes
 
         // Actions
         const actions = filterActions(inputs, scanResult.actions, excludes)
