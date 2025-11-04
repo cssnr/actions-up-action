@@ -36,11 +36,13 @@ outputs:
   hasUpdates:
     description: "If Updates true Else false"
   actions:
-    description: "Actions Checked"
+    description: "Actions Checked JSON"
   updates:
-    description: "Actions Up Results"
+    description: "Actions Up Results JSON"
+  table:
+    description: "Resulting Markdown Table String"
   markdown:
-    description: "Results Markdown Table"
+    description: "Full Markdown Comment Output String"
 
 runs:
   using: "node24"
