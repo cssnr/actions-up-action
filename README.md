@@ -219,9 +219,10 @@ Permissions documentation for [Workflows](https://docs.github.com/en/actions/wri
 | Output     | Description&nbsp;of&nbsp;the&nbsp;Output |
 | :--------- | :--------------------------------------- |
 | hasUpdates | If Updates `true` else `false`           |
-| actions    | Actions Checked                          |
-| updates    | Available Updates                        |
-| markdown   | Markdown Results                         |
+| actions    | Actions Checked JSON                     |
+| updates    | Actions Up Results JSON                  |
+| table      | Resulting Markdown Table String          |
+| markdown   | Full Markdown Comment Output String      |
 
 <details><summary>View Data Structure: actions</summary>
 

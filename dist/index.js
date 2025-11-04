@@ -42071,27 +42071,40 @@ const maps = {
         console.log(scanResult);
         coreExports.endGroup(); // Scan Result
 
+        const excludes = inputs.exclude
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+
         // Actions
-        const actions = filterActions(inputs, scanResult.actions);
+        const actions = filterActions(inputs, scanResult.actions, excludes);
         coreExports.startGroup(`Actions (${actions.length})`);
         console.log(actions);
         coreExports.endGroup(); // Actions
 
         // Updates
         const actionUpdates = await checkUpdates(actions);
+        console.log('actionUpdates:', actionUpdates);
         const updates = actionUpdates.filter((item) => item.hasUpdate);
         coreExports.startGroup(`Updates (${updates.length})`);
         console.log(updates);
         coreExports.endGroup(); // Updates
 
-        // Table Data
-        const tableData = genTableData(inputs, updates);
-        coreExports.startGroup(`Table Data (${tableData.length})`);
-        console.log(tableData);
+        // Table
+        const table = genTable(inputs, updates);
+        coreExports.startGroup(`Table`);
+        console.log(table);
         coreExports.endGroup(); // Table Data
 
         // Markdown
-        const markdown = genMarkdown(inputs, scanResult, actions, tableData);
+        const markdown = genMarkdown(
+            inputs,
+            scanResult,
+            actions,
+            updates,
+            table,
+            excludes
+        );
         coreExports.startGroup('Markdown');
         console.log(markdown);
         coreExports.endGroup(); // Markdown
@@ -42118,6 +42131,7 @@ const maps = {
         coreExports.setOutput('hasUpdates', hasUpdates);
         coreExports.setOutput('actions', actions);
         coreExports.setOutput('updates', updates);
+        coreExports.setOutput('table', table);
         coreExports.setOutput('markdown', markdown);
 
         // Summary
@@ -42204,17 +42218,14 @@ async function updatePull(inputs, markdown, changes) {
  * Filter Actions
  * @param {Inputs} inputs
  * @param {*[]} actions
+ * @param {string[]} excludes
  * @return {*[]}
  */
-function filterActions(inputs, actions) {
+function filterActions(inputs, actions, excludes) {
     coreExports.debug(`filterActions - actions.length: ${actions.length}`);
     if (!actions.length) return actions
 
-    if (inputs.exclude) {
-        const excludes = inputs.exclude
-            .split(/[,\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean);
+    if (excludes) {
         coreExports.startGroup(`Action Excludes (${excludes.length})`);
         console.log(excludes);
         coreExports.endGroup();
@@ -42226,16 +42237,14 @@ function filterActions(inputs, actions) {
     }
 
     if (inputs.files) {
-        const excludes = inputs.files
+        const files = inputs.files
             .split(/[,\n]/)
             .map((s) => s.trim())
             .filter(Boolean);
-        coreExports.startGroup(`Workflow Excludes (${excludes.length})`);
-        console.log(excludes);
+        coreExports.startGroup(`Workflow Excludes (${files.length})`);
+        console.log(files);
         coreExports.endGroup();
-        actions = actions.filter((action) => {
-            return !excludes.includes(path.basename(action.file))
-        });
+        actions = actions.filter((action) => !files.includes(path.basename(action.file)));
     } else {
         coreExports.debug('No Workflow Excludes');
     }
@@ -42247,11 +42256,13 @@ function filterActions(inputs, actions) {
  * Generate Table Data
  * @param {Inputs} inputs
  * @param {*[]} updates
- * @return {*[]}
+ * @return {string}
  */
-function genTableData(inputs, updates) {
-    coreExports.debug(`genTableData - updates.length: ${updates.length}`);
-    const results = [];
+function genTable(inputs, updates) {
+    coreExports.debug(`genTable - updates.length: ${updates.length}`);
+    if (!updates.length) return ''
+
+    const data = [];
     for (const update of updates) {
         const fileName = update.action.file.split('.github/workflows/')[1];
         coreExports.debug(`fileName: ${fileName}`);
@@ -42277,9 +42288,15 @@ function genTableData(inputs, updates) {
         // console.log('pkg:', pkg)
         const result = [];
         inputs.columns.forEach((k) => result.push(pkg[k]));
-        results.push(result);
+        data.push(result);
     }
-    return results
+    coreExports.debug(`data.length: ${data.length}`);
+
+    const [cols, align] = [[], []];
+    inputs.columns.forEach((c) => cols.push(maps[c].col));
+    inputs.columns.forEach((c) => align.push(maps[c].align));
+    // console.log('cols, align:', cols, align)
+    return markdownTable([cols, ...data], { align })
 }
 
 /**
@@ -42287,28 +42304,24 @@ function genTableData(inputs, updates) {
  * @param {Inputs} inputs
  * @param scanResult
  * @param {*[]} actions
- * @param {*[]} tableData
+ * @param {*[]} updates
+ * @param {string} table
+ * @param {string[]} excludes
  * @return {string}
  */
-function genMarkdown(inputs, scanResult, actions, tableData) {
+function genMarkdown(inputs, scanResult, actions, updates, table, excludes) {
+    coreExports.debug(`genTable - actions: ${actions.length} - updates: ${updates.length}`);
     let md = `${inputs.heading}\n\n`;
-    md += `Scanned ${scanResult.workflows.size} workflows, checked ${actions.length} actions and found ${tableData.length} updates.\n\n`;
-
-    if (tableData.length) {
-        const [cols, align] = [[], []];
-        inputs.columns.forEach((c) => cols.push(maps[c].col));
-        inputs.columns.forEach((c) => align.push(maps[c].align));
-        // console.log('cols, align:', cols, align)
-
-        const open = inputs.open ? ' open' : '';
-        const table = markdownTable([cols, ...tableData], { align });
-        // console.log('table:\n', table)
-        md += `<details${open}><summary>Results</summary>\n\n${table}\n\n</details>\n\n`;
+    md += `Scanned ${scanResult.workflows.size} workflows, checked ${actions.length} actions and found ${updates.length} updates.\n\n`;
+    if (updates.length) {
+        md += `<details${inputs.open ? ' open' : ''}><summary>Results</summary>\n\n${table}\n\n</details>\n\n`;
+        md += `\`\`\`shell\nactions-up `;
+        if (excludes.length) md += `--exclude "${excludes.join(',')}" `;
+        md += `--yes\n\`\`\`\n\n`;
     } else {
-        coreExports.debug('No tableData');
+        coreExports.debug('No Updates');
         md += `✅ All Checked Actions Up-To-Date\n`;
     }
-
     return md
 }
 
