@@ -16,5 +16,4 @@ ALWAYS use the `npm run *` command
 | ------------------ | --------------------------------------- |
 | `npm run build`    | Rollup `src/index.ts` → `dist/index.js` |
 | `npm run lint`     | ESLint on `src/`                        |
-| `npm run tsc`      | TypeScript check (`--noEmit`)           |
 | `npm run prettier` | ALWAYS RUN AFTER EDITING FILES          |
