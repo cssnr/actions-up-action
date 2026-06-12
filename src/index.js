@@ -1,135 +1,119 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-
 import path from 'node:path'
-
 import { createHash } from 'node:crypto'
 import { markdownTable } from 'markdown-table'
 import { scanGitHubActions, checkUpdates } from 'actions-up'
-
 import { Pull } from './api.js'
 
 const maps = {
-    n: { align: 'l', col: 'Name' },
-    f: { align: 'l', col: 'File' },
-    b: { align: 'c', col: 'Breaking' },
-    c: { align: 'c', col: 'Current' },
-    l: { align: 'c', col: 'Latest' },
-    s: { align: 'l', col: 'Hash' },
+  n: { align: 'l', col: 'Name' },
+  f: { align: 'l', col: 'File' },
+  b: { align: 'c', col: 'Breaking' },
+  c: { align: 'c', col: 'Current' },
+  l: { align: 'c', col: 'Latest' },
+  s: { align: 'l', col: 'Hash' },
 }
 
-;(async () => {
+async function main() {
+  core.info(`🏳️ Starting Actions Up`)
+
+  // // Debug
+  // core.startGroup('Debug: github.context')
+  // console.log(github.context)
+  // core.endGroup() // Debug github.context
+  // core.startGroup('Debug: process.env')
+  // console.log(process.env)
+  // core.endGroup() // Debug process.env
+
+  // Inputs
+  const inputs = getInputs()
+  core.startGroup('Inputs')
+  console.log(inputs)
+  core.endGroup() // Inputs
+
+  process.env['GITHUB_TOKEN'] = inputs.token
+  const excludes = inputs.exclude
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  // Scan Result
+  const scanResult = await scanGitHubActions(inputs.path)
+  core.startGroup(`Scan Result: \u001b[36;1m${inputs.path}`)
+  console.log(scanResult)
+  core.endGroup() // Scan Result
+
+  // Actions
+  const actions = filterActions(inputs, scanResult.actions, excludes)
+  core.startGroup(`Actions (${actions.length})`)
+  console.log(actions)
+  core.endGroup() // Actions
+
+  // Updates
+  const actionUpdates = await checkUpdates(actions)
+  // console.log('actionUpdates:', actionUpdates)
+  const updates = actionUpdates.filter((item) => item.hasUpdate)
+  core.startGroup(`Updates (${updates.length})`)
+  console.log(updates)
+  core.endGroup() // Updates
+
+  // Table
+  const table = genTable(inputs, updates)
+  core.startGroup(`Table`)
+  console.log(table)
+  core.endGroup() // Table Data
+
+  // Markdown
+  const markdown = genMarkdown(inputs, scanResult, actions, updates, table, excludes)
+  core.startGroup('Markdown')
+  console.log(markdown)
+  core.endGroup() // Markdown
+
+  // Update PR
+  const hasUpdates = !!updates.length
+  core.info(`Has Updates: \u001b[36;1m${hasUpdates}`)
+
+  const events = ['pull_request', 'pull_request_target']
+  const isPR = events.includes(github.context.eventName)
+  core.info(`Pull Request: \u001b[36;1m${isPR}`)
+
+  let comment
+  if (isPR && (github.context.payload.pull_request?.comments || hasUpdates)) {
+    core.startGroup(`Processing PR: ${github.context.payload.number}`)
+    comment = await updatePull(inputs, markdown, hasUpdates)
+    core.endGroup() // Processing PR
+  } else {
+    console.log('Not PR AND (No Comments OR No Updates)')
+  }
+
+  // Outputs
+  core.info('📩 Setting Outputs')
+  core.setOutput('hasUpdates', hasUpdates)
+  core.setOutput('actions', actions)
+  core.setOutput('updates', updates)
+  core.setOutput('table', table)
+  core.setOutput('markdown', markdown)
+
+  // Summary
+  if (inputs.summary) {
+    core.info('📝 Writing Job Summary')
     try {
-        core.info(`🏳️ Starting Actions Up`)
-
-        // // Debug
-        // core.startGroup('Debug: github.context')
-        // console.log(github.context)
-        // core.endGroup() // Debug github.context
-        // core.startGroup('Debug: process.env')
-        // console.log(process.env)
-        // core.endGroup() // Debug process.env
-
-        // Inputs
-        const inputs = getInputs()
-        core.startGroup('Inputs')
-        console.log(inputs)
-        core.endGroup() // Inputs
-
-        process.env['GITHUB_TOKEN'] = inputs.token
-        const excludes = inputs.exclude
-            .split(/[,\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean)
-
-        // Scan Result
-        const scanResult = await scanGitHubActions(inputs.path)
-        core.startGroup(`Scan Result: \u001b[36;1m${inputs.path}`)
-        console.log(scanResult)
-        core.endGroup() // Scan Result
-
-        // Actions
-        const actions = filterActions(inputs, scanResult.actions, excludes)
-        core.startGroup(`Actions (${actions.length})`)
-        console.log(actions)
-        core.endGroup() // Actions
-
-        // Updates
-        const actionUpdates = await checkUpdates(actions)
-        // console.log('actionUpdates:', actionUpdates)
-        const updates = actionUpdates.filter((item) => item.hasUpdate)
-        core.startGroup(`Updates (${updates.length})`)
-        console.log(updates)
-        core.endGroup() // Updates
-
-        // Table
-        const table = genTable(inputs, updates)
-        core.startGroup(`Table`)
-        console.log(table)
-        core.endGroup() // Table Data
-
-        // Markdown
-        const markdown = genMarkdown(
-            inputs,
-            scanResult,
-            actions,
-            updates,
-            table,
-            excludes
-        )
-        core.startGroup('Markdown')
-        console.log(markdown)
-        core.endGroup() // Markdown
-
-        // Update PR
-        const hasUpdates = !!updates.length
-        core.info(`Has Updates: \u001b[36;1m${hasUpdates}`)
-
-        const events = ['pull_request', 'pull_request_target']
-        const isPR = events.includes(github.context.eventName)
-        core.info(`Pull Request: \u001b[36;1m${isPR}`)
-
-        let comment
-        if (isPR && (github.context.payload.pull_request?.comments || hasUpdates)) {
-            core.startGroup(`Processing PR: ${github.context.payload.number}`)
-            comment = await updatePull(inputs, markdown, hasUpdates)
-            core.endGroup() // Processing PR
-        } else {
-            console.log('Not PR AND (No Comments OR No Updates)')
-        }
-
-        // Outputs
-        core.info('📩 Setting Outputs')
-        core.setOutput('hasUpdates', hasUpdates)
-        core.setOutput('actions', actions)
-        core.setOutput('updates', updates)
-        core.setOutput('table', table)
-        core.setOutput('markdown', markdown)
-
-        // Summary
-        if (inputs.summary) {
-            core.info('📝 Writing Job Summary')
-            try {
-                await addSummary(inputs, markdown, comment, actions, updates)
-            } catch (e) {
-                console.log(e)
-                core.error(`Error writing Job Summary: ${e.message}`)
-            }
-        }
-
-        // Finish
-        if (inputs.fail && hasUpdates) {
-            core.info(`⛔ \u001b[31;1mUpdates Found`)
-            core.setFailed('Updates found and fail is set to true.')
-        } else {
-            core.info(`✅ \u001b[32;1mFinished Success`)
-        }
+      await addSummary(inputs, markdown, comment, actions, updates)
     } catch (e) {
-        core.debug(e)
-        core.info(e.message)
-        core.setFailed(e.message)
+      console.log(e)
+      core.error(`Error writing Job Summary: ${e.message}`)
     }
-})()
+  }
+
+  // Finish
+  if (inputs.fail && hasUpdates) {
+    core.info(`⛔ \u001b[31;1mUpdates Found`)
+    core.setFailed('Updates found and fail is set to true.')
+  } else {
+    core.info(`✅ \u001b[32;1mFinished Success`)
+  }
+}
 
 /**
  * Update PR
@@ -139,51 +123,51 @@ const maps = {
  * @return {Promise<Object|undefined>}
  */
 async function updatePull(inputs, markdown, changes) {
-    if (!github.context.payload.pull_request?.number) {
-        throw new Error('Unable to determine the Pull Request number!')
-    }
+  if (!github.context.payload.pull_request?.number) {
+    throw new Error('Unable to determine the Pull Request number!')
+  }
 
-    const newHex = createHash('sha256').update(markdown).digest('hex')
-    const id = `<!-- actions-up-action ${newHex} -->`
-    const body = `${id}\n${markdown}`
+  const newHex = createHash('sha256').update(markdown).digest('hex')
+  const id = `<!-- actions-up-action ${newHex} -->`
+  const body = `${id}\n${markdown}`
 
-    const pull = new Pull(github.context, inputs.token)
+  const pull = new Pull(github.context, inputs.token)
 
-    // Step 1 - Check for Current Comment
-    let comment = await pull.getComment('<!-- actions-up-action')
-    // console.log('comment:', comment)
-    if (!comment && !changes) {
-        console.log('no comment AND no changes, skipping...')
-        return comment
-    }
+  // Step 1 - Check for Current Comment
+  let comment = await pull.getComment('<!-- actions-up-action')
+  // console.log('comment:', comment)
+  if (!comment && !changes) {
+    console.log('no comment AND no changes, skipping...')
+    return comment
+  }
 
-    // Step 2 - Update Comment: Skip, Edit, or Add
-    if (comment) {
-        // Step 2A - Comment Found ...
-        console.log('Comment ID:', comment.id)
-        const oldHex = comment.body.split(' ', 3)[2]
-        console.log('oldHex:', oldHex)
-        console.log('newHex:', newHex)
-        if (oldHex === newHex) {
-            // Step 2A-1 - Valid Hex - Skip
-            console.log('Comment Valid Hex - Skip')
-            return comment
-        } else {
-            // Step 2A-2 - Invalid Hex - Edit
-            console.log('Comment Invalid Hex - Edit')
-            // TODO: Add error handling
-            const response = await pull.updateComment(comment.id, body)
-            console.log('response.status:', response.status)
-            return comment
-        }
+  // Step 2 - Update Comment: Skip, Edit, or Add
+  if (comment) {
+    // Step 2A - Comment Found ...
+    console.log('Comment ID:', comment.id)
+    const oldHex = comment.body.split(' ', 3)[2]
+    console.log('oldHex:', oldHex)
+    console.log('newHex:', newHex)
+    if (oldHex === newHex) {
+      // Step 2A-1 - Valid Hex - Skip
+      console.log('Comment Valid Hex - Skip')
+      return comment
     } else {
-        // Step 2B - Comment Not Found - Add
-        console.log('Comment Not Found - Add')
-        // TODO: Add error handling
-        const response = await pull.createComment(body)
-        console.log('response.status:', response.status)
-        return response.data
+      // Step 2A-2 - Invalid Hex - Edit
+      console.log('Comment Invalid Hex - Edit')
+      // TODO: Add error handling
+      const response = await pull.updateComment(comment.id, body)
+      console.log('response.status:', response.status)
+      return comment
     }
+  } else {
+    // Step 2B - Comment Not Found - Add
+    console.log('Comment Not Found - Add')
+    // TODO: Add error handling
+    const response = await pull.createComment(body)
+    console.log('response.status:', response.status)
+    return response.data
+  }
 }
 
 /**
@@ -194,34 +178,37 @@ async function updatePull(inputs, markdown, changes) {
  * @return {*[]}
  */
 function filterActions(inputs, actions, excludes) {
-    core.debug(`filterActions - actions.length: ${actions.length}`)
-    if (!actions.length) return actions
+  core.debug(`filterActions - actions.length: ${actions.length}`)
+  if (!actions.length) return actions
 
-    if (excludes) {
-        core.startGroup(`Action Excludes (${excludes.length})`)
-        console.log(excludes)
-        core.endGroup()
-        actions = actions.filter((action) => {
-            return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
-        })
-    } else {
-        core.debug('No Action Excludes')
-    }
+  // NOTE: ignore-comments needs to be manually filtered here...
+  // https://github.com/azat-io/actions-up?tab=readme-ov-file#ignore-comments
 
-    if (inputs.files) {
-        const files = inputs.files
-            .split(/[,\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean)
-        core.startGroup(`Workflow Excludes (${files.length})`)
-        console.log(files)
-        core.endGroup()
-        actions = actions.filter((action) => !files.includes(path.basename(action.file)))
-    } else {
-        core.debug('No Workflow Excludes')
-    }
+  if (excludes) {
+    core.startGroup(`Action Excludes (${excludes.length})`)
+    console.log(excludes)
+    core.endGroup()
+    actions = actions.filter((action) => {
+      return !excludes.some((pattern) => new RegExp(pattern).test(action.name))
+    })
+  } else {
+    core.debug('No Action Excludes')
+  }
 
-    return actions
+  if (inputs.files) {
+    const files = inputs.files
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    core.startGroup(`Workflow Excludes (${files.length})`)
+    console.log(files)
+    core.endGroup()
+    actions = actions.filter((action) => !files.includes(path.basename(action.file)))
+  } else {
+    core.debug('No Workflow Excludes')
+  }
+
+  return actions
 }
 
 /**
@@ -231,44 +218,44 @@ function filterActions(inputs, actions, excludes) {
  * @return {string}
  */
 function genTable(inputs, updates) {
-    core.debug(`genTable - updates.length: ${updates.length}`)
-    if (!updates.length) return ''
+  core.debug(`genTable - updates.length: ${updates.length}`)
+  if (!updates.length) return ''
 
-    const data = []
-    for (const update of updates) {
-        const fileName = update.action.file.split('.github/workflows/')[1]
-        core.debug(`fileName: ${fileName}`)
+  const data = []
+  for (const update of updates) {
+    const fileName = update.action.file.split('.github/workflows/')[1]
+    core.debug(`fileName: ${fileName}`)
 
-        let url
-        if (github.context.payload.pull_request?.head) {
-            core.debug('Generating File Links to Pull Request')
-            url = `${github.context.payload.pull_request.head.repo.html_url}/blob/${github.context.payload.pull_request.head.ref}/.github/workflows/${fileName}#L${update.action.line}`
-        } else {
-            core.debug('Generating File Links to Branch')
-            url = `${github.context.payload.repository.html_url}/blob/${process.env.GITHUB_REF_NAME}/.github/workflows/${fileName}#L${update.action.line}`
-        }
-        core.debug(`url: ${url}`)
-
-        const pkg = {
-            n: `[${update.action.name}](https://github.com/${update.action.name})`,
-            f: `[${fileName}](${url})`,
-            b: update.isBreaking ? '⚠️' : '-',
-            c: update.currentVersion,
-            l: update.latestVersion,
-            s: update.latestSha,
-        }
-        // console.log('pkg:', pkg)
-        const result = []
-        inputs.columns.forEach((k) => result.push(pkg[k]))
-        data.push(result)
+    let url
+    if (github.context.payload.pull_request?.head) {
+      core.debug('Generating File Links to Pull Request')
+      url = `${github.context.payload.pull_request.head.repo.html_url}/blob/${github.context.payload.pull_request.head.ref}/.github/workflows/${fileName}#L${update.action.line}`
+    } else {
+      core.debug('Generating File Links to Branch')
+      url = `${github.context.payload.repository.html_url}/blob/${process.env.GITHUB_REF_NAME}/.github/workflows/${fileName}#L${update.action.line}`
     }
-    core.debug(`data.length: ${data.length}`)
+    core.debug(`url: ${url}`)
 
-    const [cols, align] = [[], []]
-    inputs.columns.forEach((c) => cols.push(maps[c].col))
-    inputs.columns.forEach((c) => align.push(maps[c].align))
-    // console.log('cols, align:', cols, align)
-    return markdownTable([cols, ...data], { align })
+    const pkg = {
+      n: `[${update.action.name}](https://github.com/${update.action.name})`,
+      f: `[${fileName}](${url})`,
+      b: update.isBreaking ? '⚠️' : '-',
+      c: update.currentVersion,
+      l: update.latestVersion,
+      s: update.latestSha,
+    }
+    // console.log('pkg:', pkg)
+    const result = []
+    inputs.columns.forEach((k) => result.push(pkg[k]))
+    data.push(result)
+  }
+  core.debug(`data.length: ${data.length}`)
+
+  const [cols, align] = [[], []]
+  inputs.columns.forEach((c) => cols.push(maps[c].col))
+  inputs.columns.forEach((c) => align.push(maps[c].align))
+  // console.log('cols, align:', cols, align)
+  return markdownTable([cols, ...data], { align })
 }
 
 /**
@@ -282,19 +269,19 @@ function genTable(inputs, updates) {
  * @return {string}
  */
 function genMarkdown(inputs, scanResult, actions, updates, table, excludes) {
-    core.debug(`genTable - actions: ${actions.length} - updates: ${updates.length}`)
-    let md = `${inputs.heading}\n\n`
-    md += `Scanned ${scanResult.workflows.size} workflows, checked ${actions.length} actions and found ${updates.length} updates.\n\n`
-    if (updates.length) {
-        md += `<details${inputs.open ? ' open' : ''}><summary>Results</summary>\n\n${table}\n\n</details>\n\n`
-        md += `\`\`\`shell\nactions-up `
-        if (excludes.length) md += `--exclude "${excludes.join(',')}" `
-        md += `--yes\n\`\`\`\n\n`
-    } else {
-        core.debug('No Updates')
-        md += `✅ All Checked Actions Up-To-Date\n`
-    }
-    return md
+  core.debug(`genTable - actions: ${actions.length} - updates: ${updates.length}`)
+  let md = `${inputs.heading}\n\n`
+  md += `Scanned ${scanResult.workflows.size} workflows, checked ${actions.length} actions and found ${updates.length} updates.\n\n`
+  if (updates.length) {
+    md += `<details${inputs.open ? ' open' : ''}><summary>Results</summary>\n\n${table}\n\n</details>\n\n`
+    md += `\`\`\`shell\nactions-up `
+    if (excludes.length) md += `--exclude "${excludes.join(',')}" `
+    md += `--yes\n\`\`\`\n\n`
+  } else {
+    core.debug('No Updates')
+    md += `✅ All Checked Actions Up-To-Date\n`
+  }
+  return md
 }
 
 /**
@@ -307,46 +294,44 @@ function genMarkdown(inputs, scanResult, actions, updates, table, excludes) {
  * @return {Promise<void>}
  */
 async function addSummary(inputs, markdown, comment, actions, updates) {
-    core.summary.addRaw('## Actions Up\n\n')
-    if (comment) {
-        const url = `https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/pull/${github.context.payload.number}#issuecomment-${comment.id}`
-        core.summary.addRaw(
-            `PR Comment: [#${github.context.payload.number}](${url}) \n\n`
-        )
-    } else {
-        core.summary.addRaw('No PR Comment Found.\n\n')
-    }
+  core.summary.addRaw('## Actions Up\n\n')
+  if (comment) {
+    const url = `https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/pull/${github.context.payload.number}#issuecomment-${comment.id}`
+    core.summary.addRaw(`PR Comment: [#${github.context.payload.number}](${url}) \n\n`)
+  } else {
+    core.summary.addRaw('No PR Comment Found.\n\n')
+  }
 
-    core.summary.addRaw(`---\n\n${markdown}\n\n---\n\n`)
+  core.summary.addRaw(`---\n\n${markdown}\n\n---\n\n`)
 
-    if (actions.length) {
-        core.summary.addRaw('<details><summary>Actions</summary>')
-        core.summary.addCodeBlock(JSON.stringify(actions, null, 2), 'json')
-        core.summary.addRaw('</details>\n\n')
-    } else {
-        core.summary.addRaw('⚠️ No Actions Found.\n')
-    }
-    // core.summary.addEOL()
-    if (updates.length) {
-        core.summary.addRaw('<details><summary>Updates</summary>')
-        core.summary.addCodeBlock(JSON.stringify(updates, null, 2), 'json')
-        core.summary.addRaw('</details>\n\n')
-    } else {
-        core.summary.addRaw('✅ No Updates.\n')
-    }
+  if (actions.length) {
+    core.summary.addRaw('<details><summary>Actions</summary>')
+    core.summary.addCodeBlock(JSON.stringify(actions, null, 2), 'json')
+    core.summary.addRaw('</details>\n\n')
+  } else {
+    core.summary.addRaw('⚠️ No Actions Found.\n')
+  }
+  // core.summary.addEOL()
+  if (updates.length) {
+    core.summary.addRaw('<details><summary>Updates</summary>')
+    core.summary.addCodeBlock(JSON.stringify(updates, null, 2), 'json')
+    core.summary.addRaw('</details>\n\n')
+  } else {
+    core.summary.addRaw('✅ No Updates.\n')
+  }
 
-    delete inputs.token
-    const yaml = Object.entries(inputs)
-        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-        .join('\n')
-    core.summary.addRaw('<details><summary>Inputs</summary>')
-    core.summary.addCodeBlock(yaml, 'yaml')
-    core.summary.addRaw('</details>\n')
+  delete inputs.token
+  const yaml = Object.entries(inputs)
+    .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+    .join('\n')
+  core.summary.addRaw('<details><summary>Inputs</summary>')
+  core.summary.addCodeBlock(yaml, 'yaml')
+  core.summary.addRaw('</details>\n')
 
-    const text = 'View Documentation, Report Issues or Request Features'
-    const link = 'https://github.com/cssnr/actions-up-action'
-    core.summary.addRaw(`\n[${text}](${link}?tab=readme-ov-file#readme)\n\n---`)
-    await core.summary.write()
+  const text = 'View Documentation, Report Issues or Request Features'
+  const link = 'https://github.com/cssnr/actions-up-action'
+  core.summary.addRaw(`\n[${text}](${link}?tab=readme-ov-file#readme)\n\n---`)
+  await core.summary.write()
 }
 
 /**
@@ -364,15 +349,22 @@ async function addSummary(inputs, markdown, comment, actions, updates) {
  * @return {Inputs}
  */
 function getInputs() {
-    return {
-        path: core.getInput('path', { required: true }),
-        heading: core.getInput('heading'),
-        open: core.getBooleanInput('open'),
-        columns: core.getInput('columns').split(','),
-        exclude: core.getInput('exclude'),
-        files: core.getInput('files'),
-        fail: core.getBooleanInput('fail'),
-        summary: core.getBooleanInput('summary'),
-        token: core.getInput('token', { required: true }),
-    }
+  return {
+    path: core.getInput('path', { required: true }),
+    heading: core.getInput('heading'),
+    open: core.getBooleanInput('open'),
+    columns: core.getInput('columns').split(','),
+    exclude: core.getInput('exclude'),
+    files: core.getInput('files'),
+    fail: core.getBooleanInput('fail'),
+    summary: core.getBooleanInput('summary'),
+    token: core.getInput('token', { required: true }),
+  }
+}
+
+try {
+  await main()
+} catch (e) {
+  const message = e instanceof Error ? e.message : 'Unknown Error'
+  core.setFailed(message)
 }

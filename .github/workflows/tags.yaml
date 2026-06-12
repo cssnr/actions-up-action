@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: "Update Tags"
-        uses: cssnr/update-version-tags-action@06ac3e56e828129c17054b39d11317584af1bd88 # v1.3.1
+        uses: cssnr/update-version-tags-action@v2
         with:
           tag: ${{ inputs.tag }}
           token: ${{ secrets.GH_PAT }}
