@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: "Checkout Configs"
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@v7
         with:
           repository: cssnr/configs
           ref: master
@@ -41,12 +41,12 @@ jobs:
 
       - name: "Label Creator"
         continue-on-error: true
-        uses: cssnr/label-creator-action@fc7d9fa6a9e27c561a2bb802a9d2a8f21682279d # v1.0.2
+        uses: cssnr/label-creator-action@v1
         with:
           file: .configs/labels/labels.yaml
 
       - name: "Labeler"
-        uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
+        uses: actions/labeler@v7
         with:
           sync-labels: true
           configuration-path: .configs/labels/labeler.yaml

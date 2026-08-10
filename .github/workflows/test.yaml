@@ -29,14 +29,38 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@v7
 
+      - name: "Debug event.json"
+        if: ${{ !github.event.act }}
+        continue-on-error: true
+        run: cat "${GITHUB_EVENT_PATH}"
       - name: "Debug CTX github"
         if: ${{ !github.event.act }}
         continue-on-error: true
         env:
           GITHUB_CTX: ${{ toJSON(github) }}
         run: echo "$GITHUB_CTX"
+      - name: "Debug Environment"
+        if: ${{ !github.event.act }}
+        continue-on-error: true
+        run: env
+
+      - name: "Debug"
+        continue-on-error: true
+        run: |
+          ls -lah .
+
+      - name: "Setup Node"
+        if: ${{ !github.event.act }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: "Install"
+        if: ${{ !github.event.act }}
+        run: |
+          npm ci
 
       - name: "Test Local Action"
         id: test
@@ -79,3 +103,4 @@ jobs:
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
